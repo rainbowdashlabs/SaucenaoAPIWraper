@@ -1,11 +1,15 @@
+/*
+ *     SPDX-License-Identifier: AGPL-3.0-only
+ *
+ *     Copyright (C) 2021 RainbowDashLabs and Contributor
+ */
+
 package de.chojo.saucenao.results;
 
 import com.google.gson.annotations.Expose;
 import com.google.gson.annotations.SerializedName;
 import de.chojo.saucenao.imagedata.util.IImageMeta;
-import lombok.Getter;
 
-@Getter
 public class ResultEntry implements IResultEntry {
     @SerializedName("header")
     private final ResultMeta resultMeta;
@@ -16,7 +20,15 @@ public class ResultEntry implements IResultEntry {
         this.resultMeta = resultMeta;
     }
 
-    public void setData(IImageMeta data) {
+    public void data(IImageMeta data) {
         this.data = data;
+    }
+
+    public ResultMeta resultMeta() {
+        return resultMeta;
+    }
+
+    public IImageMeta data() {
+        return data;
     }
 }

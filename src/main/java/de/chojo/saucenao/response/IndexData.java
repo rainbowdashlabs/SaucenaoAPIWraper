@@ -1,8 +1,11 @@
+/*
+ *     SPDX-License-Identifier: AGPL-3.0-only
+ *
+ *     Copyright (C) 2021 RainbowDashLabs and Contributor
+ */
+
 package de.chojo.saucenao.response;
 
-import lombok.Getter;
-
-@Getter
 public class IndexData {
     /**
      * status fields are 0 if success, >0 for server side errors (failed descriptor gen, failed query, etc), <0 for
@@ -22,4 +25,20 @@ public class IndexData {
      * Count of results.
      */
     private final int results = 0;
+
+    public int status() {
+        return status;
+    }
+
+    public int parentId() {
+        return parentId;
+    }
+
+    public int id() {
+        return id;
+    }
+
+    public int results() {
+        return results;
+    }
 }

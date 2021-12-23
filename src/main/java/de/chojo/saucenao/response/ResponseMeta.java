@@ -1,14 +1,18 @@
+/*
+ *     SPDX-License-Identifier: AGPL-3.0-only
+ *
+ *     Copyright (C) 2021 RainbowDashLabs and Contributor
+ */
+
 package de.chojo.saucenao.response;
 
 import com.google.gson.annotations.Expose;
 import com.google.gson.annotations.SerializedName;
-import lombok.Getter;
 
 import java.util.Map;
 import java.util.OptionalInt;
 
 
-@Getter
 public class ResponseMeta {
     @SerializedName("user_id")
     @Expose
@@ -73,7 +77,7 @@ public class ResponseMeta {
      * Error message, if the request failed.
      */
     @Expose
-    private final String message = null;
+    private String message;
     /**
      * Status of requested indices.
      */
@@ -89,8 +93,56 @@ public class ResponseMeta {
      * @return id of parent index.
      */
     public OptionalInt getParentId(int id) {
-        IndexData indexData = this.indexData.get(Integer.toString(id));
+        var indexData = this.indexData.get(Integer.toString(id));
         if (indexData == null) return OptionalInt.empty();
-        return OptionalInt.of(indexData.getParentId());
+        return OptionalInt.of(indexData.parentId());
+    }
+
+    public int userId() {
+        return userId;
+    }
+
+    public int accountType() {
+        return accountType;
+    }
+
+    public long shortLimit() {
+        return shortLimit;
+    }
+
+    public long longLimit() {
+        return longLimit;
+    }
+
+    public long shortRemaining() {
+        return shortRemaining;
+    }
+
+    public long longRemaining() {
+        return longRemaining;
+    }
+
+    public int status() {
+        return status;
+    }
+
+    public int resultsRequested() {
+        return resultsRequested;
+    }
+
+    public int resultsReturned() {
+        return resultsReturned;
+    }
+
+    public float minimumSimilarity() {
+        return minimumSimilarity;
+    }
+
+    public String message() {
+        return message;
+    }
+
+    public Map<String, IndexData> indexData() {
+        return indexData;
     }
 }

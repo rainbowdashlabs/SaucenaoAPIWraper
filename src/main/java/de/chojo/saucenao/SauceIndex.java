@@ -1,3 +1,9 @@
+/*
+ *     SPDX-License-Identifier: AGPL-3.0-only
+ *
+ *     Copyright (C) 2021 RainbowDashLabs and Contributor
+ */
+
 package de.chojo.saucenao;
 
 import de.chojo.saucenao.imagedata.Anime;
@@ -125,13 +131,13 @@ public enum SauceIndex {
      */
     <T extends IImageMeta> SauceIndex(int index, Class<T> dataClass) {
         this.index = index;
-        this.bitmask = indexToBitmask(index);
+        bitmask = indexToBitmask(index);
         this.dataClass = dataClass;
     }
 
     private static long indexToBitmask(long index) {
         long res = 1;
-        long sq = 2L;
+        var sq = 2L;
         while (index > 0) {
             if (index % 2 == 1) {
                 res *= sq;
@@ -143,7 +149,7 @@ public enum SauceIndex {
     }
 
     public static SauceIndex getIndex(int index) {
-        for (SauceIndex value : values()) {
+        for (var value : values()) {
             if (value.index == index) return value;
         }
         return UNKOWN;

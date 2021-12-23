@@ -1,21 +1,24 @@
+/*
+ *     SPDX-License-Identifier: AGPL-3.0-only
+ *
+ *     Copyright (C) 2021 RainbowDashLabs and Contributor
+ */
+
 package de.chojo.saucenao;
 
 import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
-import com.google.gson.JsonArray;
 import com.google.gson.JsonElement;
 import com.google.gson.JsonParser;
-import de.chojo.saucenao.imagedata.util.IImageMeta;
 import de.chojo.saucenao.response.ISauceResponse;
 import de.chojo.saucenao.response.SauceResponse;
 import de.chojo.saucenao.results.IResultEntry;
 import de.chojo.saucenao.results.ResultEntry;
 import de.chojo.saucenao.results.ResultMeta;
-import lombok.extern.slf4j.Slf4j;
 import okhttp3.OkHttpClient;
 import okhttp3.Request;
-import okhttp3.Response;
 import org.jetbrains.annotations.Nullable;
+import org.slf4j.Logger;
 
 import java.io.IOException;
 import java.io.UnsupportedEncodingException;
@@ -28,14 +31,15 @@ import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
-import java.util.OptionalInt;
+import java.util.Optional;
+
+import static org.slf4j.LoggerFactory.getLogger;
 
 /**
  * Entry point for api requests. A reusable api wrapper to perform requests against the saucenao api.
  */
-@Slf4j
 public final class SaucenaoApiWrapper {
-
+    private static final Logger log = getLogger(SaucenaoApiWrapper.class);
     private final String request;
     private final HttpClient httpClient;
     private final OkHttpClient okHttpClient;
@@ -58,7 +62,6 @@ public final class SaucenaoApiWrapper {
      * Get a new saucenao api wrapper builder.
      *
      * @param key key for api. can be null.
-     *
      * @return builder with key
      */
     public static SaucenaoApiWrapperBuilder builder(@Nullable String key) {
@@ -78,32 +81,31 @@ public final class SaucenaoApiWrapper {
      * Requests saucenao based on an image url.
      *
      * @param url url to check
-     *
      * @return sauce response.
      */
-    public ISauceResponse requestImage(String url) {
-        String httpResponse = requestSauce(url);
-        if (httpResponse == null) return null;
+    public Optional<ISauceResponse> requestImage(String url) {
+        var httpResponse = requestSauce(url);
+        if (httpResponse.isEmpty()) return Optional.empty();
 
         // build json element from string
-        JsonElement jsonResponse = new JsonParser().parse(httpResponse);
+        var jsonResponse = new JsonParser().parse(httpResponse.get());
 
         // create general response.
-        SauceResponse sauceResponse = exposedParser.fromJson(jsonResponse, SauceResponse.class);
+        var sauceResponse = exposedParser.fromJson(jsonResponse, SauceResponse.class);
 
-        List<IResultEntry> sauceResultEntries = parseResults(sauceResponse, jsonResponse);
+        var sauceResultEntries = parseResults(sauceResponse, jsonResponse);
 
         sauceResponse.setResults(sauceResultEntries);
-        return sauceResponse;
+        return Optional.of(sauceResponse);
     }
 
-    private String requestSauce(String url) {
+    private Optional<String> requestSauce(String url) {
         String requestUrl;
         try {
-            requestUrl = this.request + URLEncoder.encode(url, StandardCharsets.UTF_8.toString());
+            requestUrl = request + URLEncoder.encode(url, StandardCharsets.UTF_8.toString());
         } catch (UnsupportedEncodingException e) {
-            log.warn("Could not encode url.");
-            return null;
+            log.warn("Could not encode url.", e);
+            return Optional.empty();
         }
 
         if (httpClient != null) {
@@ -113,60 +115,57 @@ public final class SaucenaoApiWrapper {
                     .build();
 
             try {
-                return httpClient.send(request, HttpResponse.BodyHandlers.ofString()).body();
+                return Optional.ofNullable(httpClient.send(request, HttpResponse.BodyHandlers.ofString()).body());
             } catch (IOException | InterruptedException e) {
-                return null;
+                return Optional.empty();
             }
-        } else {
-            Request request = new Request.Builder().url(requestUrl).get().build();
-            try (Response execute = okHttpClient.newCall(request).execute()) {
-                if (execute.body() == null) return null;
-                return execute.body().string();
-            } catch (IOException e) {
-                log.error("Request failed", e);
-                return null;
-            }
+        }
+        var request = new Request.Builder().url(requestUrl).get().build();
+        try (var execute = okHttpClient.newCall(request).execute(); var body = execute.body()) {
+            if (body == null) return Optional.empty();
+            return Optional.of(body.string());
+        } catch (IOException e) {
+            log.error("Request failed", e);
+            return Optional.empty();
         }
     }
 
     private List<IResultEntry> parseResults(SauceResponse sauceResponse, JsonElement jsonResponse) {
-        JsonArray resultJson = jsonResponse.getAsJsonObject().getAsJsonArray("results");
+        var resultJson = jsonResponse.getAsJsonObject().getAsJsonArray("results");
 
         if (resultJson == null) return Collections.emptyList();
 
-        ArrayList<IResultEntry> results = new ArrayList<>();
+        var results = new ArrayList<IResultEntry>();
 
-        for (JsonElement element : resultJson) {
+        for (var element : resultJson) {
             // build base result object.
-            JsonElement header = element.getAsJsonObject().get("header");
-            ResultMeta resultMeta = generalParser.fromJson(header, ResultMeta.class);
+            var header = element.getAsJsonObject().get("header");
+            var resultMeta = generalParser.fromJson(header, ResultMeta.class);
 
-            ResultEntry result = new ResultEntry(resultMeta);
+            var result = new ResultEntry(resultMeta);
 
             // determine index
-            int indexId = result.getResultMeta().getIndexId();
-            SauceIndex index = SauceIndex.getIndex(indexId);
+            var indexId = result.resultMeta().indexId();
+            var index = SauceIndex.getIndex(indexId);
             if (index == SauceIndex.UNKOWN) {
-                OptionalInt parentId = sauceResponse.getResponseMeta().getParentId(indexId);
+                var parentId = sauceResponse.responseMeta().getParentId(indexId);
                 if (parentId.isPresent()) {
                     index = SauceIndex.getIndex(parentId.getAsInt());
                 } else {
-                    log.info("Index \"" + result.getResultMeta().getIndexName() + "\" with id "
-                            + indexId + " is unknown.");
+                    log.info("Index {} with id {} is unknown.", result.resultMeta().indexName(), indexId);
                     continue;
                 }
             }
 
             if (index.getDataClass() == null) {
-                log.info("Index \"" + result.getResultMeta().getIndexName() + "\" with id "
-                        + indexId + " has no mapping class.");
+                log.info("Index {} with id {} has no mapping class.", result.resultMeta().indexName(), indexId);
                 continue;
             }
 
             // Build data object based on index.
-            IImageMeta data = generalParser.fromJson(element.getAsJsonObject().get("data"), index.getDataClass());
+            var data = generalParser.fromJson(element.getAsJsonObject().get("data"), index.getDataClass());
 
-            result.setData(data);
+            result.data(data);
             results.add(result);
         }
         return results;
@@ -175,8 +174,8 @@ public final class SaucenaoApiWrapper {
     public static final class SaucenaoApiWrapperBuilder {
         private final String key;
         private SauceIndex[] indices;
-        private long excludeBitmask = 0;
-        private int testmode = 0;
+        private long excludeBitmask;
+        private int testmode;
         private int count = 1;
         private HttpClient httpClient;
         private OkHttpClient okHttpClient;
@@ -186,16 +185,14 @@ public final class SaucenaoApiWrapper {
         }
 
         private SaucenaoApiWrapperBuilder() {
-            this.key = null;
+            key = null;
         }
 
         /**
          * Add indices to the wrapper. Will override already set indiced. Default value is {@link SauceIndex#ALL}
          *
          * @param indices indices to use.
-         *
          * @return builder with indices set.
-         *
          * @throws IllegalArgumentException when flag {@link SauceIndex#ALL} is used with other flags.
          */
         public SaucenaoApiWrapperBuilder withIndices(SauceIndex... indices) throws IllegalArgumentException {
@@ -205,7 +202,7 @@ public final class SaucenaoApiWrapper {
             this.indices = indices;
 
             long bitmask = 0;
-            for (SauceIndex index : indices) {
+            for (var index : indices) {
                 if (index == SauceIndex.ALL && indices.length != 1) {
                     throw new IllegalArgumentException("ALL index was used with more indices");
                 }
@@ -222,7 +219,7 @@ public final class SaucenaoApiWrapper {
                 }
 
                 if (deprecated != null) {
-                    log.warn("Usage of deprecated index " + index.name() + " detected.");
+                    log.warn("Usage of deprecated index {} detected.", index.name());
                 }
             }
             return this;
@@ -232,14 +229,12 @@ public final class SaucenaoApiWrapper {
          * Exclude indices. Usefull if {@link #withIndices(SauceIndex...)} is set to {@link SauceIndex#ALL}.
          *
          * @param indices indices to exclude
-         *
          * @return builder with excluded indices set
-         *
          * @throws IllegalArgumentException when flag {@link SauceIndex#ALL} is used
          */
         public SaucenaoApiWrapperBuilder excludeIndices(SauceIndex... indices) throws IllegalArgumentException {
             long bitmask = 0;
-            for (SauceIndex index : indices) {
+            for (var index : indices) {
                 bitmask += index.bitmask;
                 if (index == SauceIndex.ALL) {
                     throw new IllegalArgumentException("ALL index was used with more indices");
@@ -266,7 +261,6 @@ public final class SaucenaoApiWrapper {
          * is 60.
          *
          * @param count max result count.
-         *
          * @return builder with result count set
          */
         public SaucenaoApiWrapperBuilder withResultCount(int count) {
@@ -276,13 +270,13 @@ public final class SaucenaoApiWrapper {
 
         public SaucenaoApiWrapperBuilder withHttpClient(OkHttpClient okHttpClient) {
             this.okHttpClient = okHttpClient;
-            this.httpClient = null;
+            httpClient = null;
             return this;
         }
 
         public SaucenaoApiWrapperBuilder withHttpClient(HttpClient httpClient) {
             this.httpClient = httpClient;
-            this.okHttpClient = null;
+            okHttpClient = null;
             return this;
         }
 
@@ -292,7 +286,7 @@ public final class SaucenaoApiWrapper {
          * @return a new api wrapper object
          */
         public SaucenaoApiWrapper build() {
-            StringBuilder builder = new StringBuilder("https://saucenao.com/search.php?output_type=2");
+            var builder = new StringBuilder("https://saucenao.com/search.php?output_type=2");
             if (key != null) {
                 builder.append("&api_key=").append(key);
             }
@@ -303,7 +297,7 @@ public final class SaucenaoApiWrapper {
             // use bitmask if more than one index is required.
             if (indices.length > 1) {
                 long bitmask = 0;
-                for (SauceIndex index : indices) {
+                for (var index : indices) {
                     bitmask += index.bitmask;
                 }
                 builder.append("&dbmask=").append(bitmask);

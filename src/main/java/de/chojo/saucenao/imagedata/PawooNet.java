@@ -1,10 +1,14 @@
+/*
+ *     SPDX-License-Identifier: AGPL-3.0-only
+ *
+ *     Copyright (C) 2021 RainbowDashLabs and Contributor
+ */
+
 package de.chojo.saucenao.imagedata;
 
 import com.google.gson.annotations.SerializedName;
 import de.chojo.saucenao.imagedata.util.ExternalUrlMeta;
-import lombok.Getter;
 
-@Getter
 public class PawooNet extends ExternalUrlMeta {
     private String createdAt;
     private int id;
@@ -24,4 +28,23 @@ public class PawooNet extends ExternalUrlMeta {
     @SerializedName("pawoo_user_display_name")
     private String pawooDisplayname;
 
+    public String createdAt() {
+        return createdAt;
+    }
+
+    public int id() {
+        return id;
+    }
+
+    public String pawooUser() {
+        return pawooUser;
+    }
+
+    public String pawooUsername() {
+        return pawooUsername;
+    }
+
+    public String pawooDisplayname() {
+        return pawooDisplayname;
+    }
 }
